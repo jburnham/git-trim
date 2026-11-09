@@ -34,6 +34,7 @@ filter_branches() {
   fi
   local exclude=( $(git config gt.exclude) )
   [ $restore_glob -eq 1 ] && set +o noglob
+  [ -n "$default_branch" ] && exclude+=("$default_branch")
 
   if [ ${#exclude} -eq 0 ]; then
     echo "$@"
@@ -116,6 +117,8 @@ untracked=0
 remote=0
 reset=''
 current_branch=$(git symbolic-ref -q --short HEAD)
+default_branch=$(git symbolic-ref -q --short refs/remotes/origin/HEAD)
+default_branch=${default_branch#origin/}
 worktree_branches=( $(git worktree list --porcelain | grep '^branch ' | sed 's|^branch refs/heads/||') )
 options=$#
 
