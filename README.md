@@ -45,6 +45,16 @@ When the `--remote` (or `-r`) option is used, `git trim` will remove remote bran
 
 Finally, you may also append the `--dry-run` option to any `git-trim` command to simply list the branches which would be deleted instead of actually removing them.
 
+For scripts, add `--porcelain` to get one tab-separated line per branch instead of the human-readable messages. The format is stable and works with or without `--dry-run`:
+
+```
+delete<TAB><branch>
+delete-remote<TAB><remote><TAB><branch>
+skip-worktree<TAB><branch><TAB><worktree path>
+```
+
+Nothing is printed when there are no branches to trim. For example, `git trim --squashed --dry-run --porcelain | grep -c '^delete'` counts the branches that would be deleted.
+
 ## Installation
 
 ### Basic install

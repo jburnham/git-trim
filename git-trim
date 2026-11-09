@@ -12,6 +12,7 @@ https://github.com/jasonmccreary/git-trim/
   Available options are:
 all!              remove all local branches, except the current branch
 dry-run!          prints branches which will be removed instead of deleting them
+porcelain!        print one tab-separated line per branch in a stable format for scripts
 m,merged!         remove local branches already merged into the current branch
 p,pruned!         remove local branches where its remote branch no longer exists
 r,remote!         remove remote branches instead of local branches
@@ -87,11 +88,19 @@ remove_tracking_branch() {
 
 remove_remote_branch() {
   if [ $dry_run -eq 1 ]; then
-    echo "$2 will be deleted from $1."
+    if [ $porcelain -eq 1 ]; then
+      printf 'delete-remote\t%s\t%s\n' "$1" "$2"
+    else
+      echo "$2 will be deleted from $1."
+    fi
   else
     git push -d $1 $2 >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-      echo "Deleted branch $2 (on $1)."
+      if [ $porcelain -eq 1 ]; then
+        printf 'delete-remote\t%s\t%s\n' "$1" "$2"
+      else
+        echo "Deleted branch $2 (on $1)."
+      fi
     fi
   fi
 }
@@ -107,21 +116,37 @@ skip_worktree_branch() {
     return 1
   fi
 
-  echo "Skipping branch $1 (checked out in worktree at $path)."
+  if [ $porcelain -eq 1 ]; then
+    printf 'skip-worktree\t%s\t%s\n' "$1" "$path"
+  else
+    echo "Skipping branch $1 (checked out in worktree at $path)."
+  fi
 }
 
 remove_local_branch() {
   if [ $dry_run -eq 1 ]; then
-    echo "$1 will be deleted."
+    if [ $porcelain -eq 1 ]; then
+      printf 'delete\t%s\n' "$1"
+    else
+      echo "$1 will be deleted."
+    fi
+  elif [ $porcelain -eq 1 ]; then
+    git branch -D $1 >/dev/null && printf 'delete\t%s\n' "$1"
   else
     git branch -D $1
   fi
+}
+
+nothing_to_trim() {
+  [ $porcelain -eq 1 ] || echo "$1"
+  exit 0
 }
 
 
 # Defaults
 all=0
 dry_run=0
+porcelain=0
 merged=0
 pruned=0
 squashed=0
@@ -150,12 +175,13 @@ while [ $# != 0 ]; do
     --reset=*) reset="${1#*=}";;
     --reset) reset='origin';;
     --dry-run) dry_run=1;;
+    --porcelain) porcelain=1;;
     --) ;;
   esac
   shift
 done
 
-if [[ $options -eq 1 || ($options -eq 2 && $dry_run -eq 1) ]]; then
+if [[ $options -eq $((1 + dry_run + porcelain)) ]]; then
   pruned=1
 fi
 
@@ -183,8 +209,7 @@ if [ $all -eq 1 ]; then
   branches=( $(filter_branches "${branches[@]}") )
 
   if [ ${#branches} -eq 0 ]; then
-    echo "No branches need to be trimmed."
-    exit 0
+    nothing_to_trim "No branches need to be trimmed."
   fi
 
   for branch in "${branches[@]}"; do
@@ -220,8 +245,7 @@ if [ $merged -eq 1 ]; then
   branches=( $(filter_branches "${branches[@]}") )
 
   if [ ${#branches} -eq 0 ]; then
-    echo "There are no merged branches to trim."
-    exit 0
+    nothing_to_trim "There are no merged branches to trim."
   fi
 
   for branch in "${branches[@]}"; do
@@ -271,8 +295,7 @@ if [ $squashed -eq 1 ]; then
   done
 
   if [ ${#branches} -eq 0 ]; then
-    echo "There are no squash-merged branches to trim."
-    exit 0
+    nothing_to_trim "There are no squash-merged branches to trim."
   fi
 
   for branch in "${branches[@]}"; do
@@ -298,8 +321,7 @@ if [ $pruned -eq 1 ]; then
   branches=( $(filter_branches "${branches[@]}") )
 
   if [ ${#branches} -eq 0 ]; then
-    echo "There are no local branches to trim."
-    exit 0
+    nothing_to_trim "There are no local branches to trim."
   fi
 
   for branch in "${branches[@]}"; do
@@ -326,8 +348,7 @@ if [ $stale -eq 1 ]; then
   done
 
   if [ ${#branches} -eq 0 ]; then
-    echo "There are no stale branches to trim."
-    exit 0
+    nothing_to_trim "There are no stale branches to trim."
   fi
 
   for branch in "${branches[@]}"; do
@@ -347,8 +368,7 @@ if [ $untracked -eq 1 ]; then
   branches=( $(filter_branches "${branches[@]}") )
 
   if [ ${#branches} -eq 0 ]; then
-    echo "There are no untracked branches to trim."
-    exit 0
+    nothing_to_trim "There are no untracked branches to trim."
   fi
 
   for branch in "${branches[@]}"; do
@@ -383,8 +403,7 @@ if [ -n "$reset" ]; then
   branches=( $(filter_branches "${branches[@]}") )
 
   if [ ${#branches} -eq 0 ]; then
-    echo "No branches need to be trimmed."
-    exit 0
+    nothing_to_trim "No branches need to be trimmed."
   fi
 
   for branch in "${branches[@]}"; do
